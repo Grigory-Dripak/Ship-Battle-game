@@ -12,6 +12,8 @@ class GameUser:
             while repeate:
                 try:
                     self.coords = tuple(map(int, input(message).split()))
+                    if not self.coords in aims:
+                        raise ValueError('Ошибочная координата, необходимо повторить ввод')
                 except ValueError as e:
                     print(e)
                 else:
@@ -71,13 +73,13 @@ class UserFleet(Field):
                         'Корабль 4': 1,"""
     def __init__(self, field_size):
         super().__init__(field_size)
-        self.infleet = {'Корабль 5': 1,
+        self.armada = {'Корабль 5': 1,
                         'Корабль 6': 1}
-        for ships, sizes in self.infleet.items():
-            self.infleet[ships] = Ship(ships, sizes)
+        for ships, sizes in self.armada.items():
+            self.armada[ships] = Ship(ships, sizes)
 
     def set_fleetposition(self, user):
-        for names, ships in self.infleet.items():
+        for names, ships in self.armada.items():
             ships.position = user
             # print(ships.position)
 
@@ -85,16 +87,23 @@ class UserFleet(Field):
 
 class GameRun:
     def __init__(self, field_size, user1, user2):
-        self.user1 = user1
-        self.user2 = user2
-        self.field_size = field_size
+        self.user1 = GameUser(user1)
+        self.user2 = GameUser(user2)
+        self.fleet1 = UserFleet(field_size)
+        self.fleet2 = UserFleet(field_size)
 
 
     def gameprocess(self):
-        self.user1_fleet = UserFleet(self.field_size)
-        self.user1_fleet.show_chess()
-        print(self.user1_fleet.myfield_coords)
-        self.user1_fleet.set_fleetposition(self.user1)
+        self.fleet1.show_chess()
+        print(self.fleet1.myfield_coords)
+        for name, ships in self.fleet1.armada.items():
+            for point in range(ships.ship_size):
+                msg = f'Введи через пробел номер стоки и колонки для координаты {point + 1} из {ships.ship_size} {name}:\n'
+                coords = self.user1.coordsinput(self.fleet1.myfield_coords, msg)
+                ships.position = coords
+                self.fleet1.draw_myfield(coords)
+                self.fleet1.show_chess()
+
 
 
 
