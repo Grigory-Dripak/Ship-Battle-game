@@ -27,7 +27,6 @@ class Field:
     def __init__(self, field_size=6):
         self.field_size = field_size
         self.my_field = [["-" for _ in range(self.field_size)] for _ in range(self.field_size)]
-        self.myfield_coords = [(i, j) for j in range(1, self.field_size + 1) for i in range(1, self.field_size + 1)]
         self.enemy_field = [["-" for _ in range(self.field_size)] for _ in range(self.field_size)]
 
     def draw_myfield(self, point, status='+'):
@@ -133,13 +132,14 @@ class GameRun:
         self.user2 = GameUser(user2)
         self.fleet1 = UserFleet(field_size)
         self.fleet2 = UserFleet(field_size)
+        self.user1_coords = [(i, j) for j in range(1, field_size + 1) for i in range(1, field_size + 1)]
+        self.user2_coords = [(i, j) for j in range(1, field_size + 1) for i in range(1, field_size + 1)]
 
 
     def gameprocess(self):
         self.fleet1.show_chess()
-        print(self.fleet1.myfield_coords)
         for name, ships in self.fleet1.armada.items():
-            possible_aims = self.fleet1.myfield_coords
+            possible_aims = self.user1_coords
             for point in range(ships.ship_size):
                 if len(possible_aims) > 1:
                     msg = f'Введи через пробел номер стоки и колонки для координаты {point + 1} из {ships.ship_size} {name}:\n'
@@ -151,18 +151,14 @@ class GameRun:
                     print(f'Координата {point + 1} из {ships.ship_size} {name} присвоена {coords}')
                 ships.position = coords
                 self.fleet1.draw_myfield(coords)
-                self.fleet1.myfield_coords.remove(coords)
+                self.user1_coords.remove(coords)
                 self.fleet1.show_chess()
                 if point == ships.ship_size - 1:
-                    cl_pos = ships.close_positions(self.fleet1.myfield_coords)
-                    print(cl_pos)
+                    cl_pos = ships.close_positions(self.user1_coords)
                     for _ in cl_pos:
-                        self.fleet1.myfield_coords.remove(_)
+                        self.user1_coords.remove(_)
                 else:
-                    possible_aims = ships.possible_pos(self.fleet1.myfield_coords)
-
-
-
+                    possible_aims = ships.possible_pos(self.user1_coords)
 
 
 
