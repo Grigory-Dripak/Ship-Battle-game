@@ -6,6 +6,7 @@ class GameUser:
         self.userid = userid
         self.score = 0
 
+
     def coordsinput(self, aims, message):
         if self.userid == 'PC':
             self.coords = aims[randint(0, len(aims)-1)]
@@ -24,7 +25,7 @@ class GameUser:
 
 
 class Ship:
-    def __init__(self, name, size):
+    def __init__(self, name='No name', size=1):
         self.name = name
         self.size = size
         self.__position = []
@@ -46,12 +47,11 @@ class BattleField(GameUser):
         self.my_field = [["o" for _ in range(field_size)] for _ in range(field_size)]
         self.enemy_field = [["o" for _ in range(field_size)] for _ in range(field_size)]
         self.fieldcoords = [(i, j) for j in range(1, field_size + 1) for i in range(1, field_size + 1)]
-        # self.selfcoords = [(i, j) for j in range(1, field_size + 1) for i in range(1, field_size + 1)]
-        # self.enemycoords = [(i, j) for j in range(1, field_size + 1) for i in range(1, field_size + 1)]
-
         self.armada = {}
         for ships, sizes in armada_params.items():
             self.armada[ships] = Ship(ships, sizes)
+        self.enemyship = []
+        self.aims = []
 
     def renew_fieldcoords(self):
         self.fieldcoords = [(i, j) for j in range(1, self.field_size + 1) for i in range(1, self.field_size + 1)]
@@ -61,6 +61,22 @@ class BattleField(GameUser):
 
     def draw_enemyfield(self, point, status='T'):
         self.enemy_field[point[0]-1][point[1]-1] = status
+
+    def markenemyship(self, point, status):
+        if len(self.enemyship) == 0 or self.enemyship[-1].status == 'Убил':
+            self.enemyship.append(Ship())
+            self.enemyship[-1].status = status
+        self.enemyship[-1].position = point
+        if status == 'Попадание':
+            self.aims = self.possible_pos(self.enemyship[-1].position)
+        elif status == 'Убил':
+            self.enemyship[-1].status = status
+            self.aims = self.close_positions(self.enemyship[-1].position)
+            for _ in self.aims:
+                if _ in self.fieldcoords:
+                    self.fieldcoords.remove(_)
+            self.aims = self.fieldcoords
+
 
     def checkcoord(self, point):
         if self.my_field[point[0]-1][point[1]-1] == '■':
@@ -75,9 +91,9 @@ class BattleField(GameUser):
                     else:
                         return 'Попадание'
         else:
-            print(f'{self.userid}: Огонь мимо цели...')
+            print(f'{self.userid}: Мимо цели...')
             self.draw_myfield(point, 'T')
-            return False
+            return 'Мимо'
 
     def close_positions(self, positionpoints):
         self.closepoints = []
@@ -149,7 +165,7 @@ class GameRun:
         #заново генерируем целевой список координат для следующего этапа игры
         for fleet in self.userfleets:
             fleet.renew_fieldcoords()
-        # #поочередно стреляем для уничтожения флота противника
+        #поочередно стреляем для уничтожения флота противника
         while True:
             self.shipsfire(self.userfleets[0], self.userfleets[1])
             self.checkscore(self.userfleets[0])
@@ -163,17 +179,21 @@ class GameRun:
 
     @classmethod
     def shipsfire(cls, myfleet, enemyfleet):
-        possible_aims = myfleet.fieldcoords
-        if len(possible_aims) != myfleet.field_size ** 2:
+        if len(myfleet.aims) == 0:
+            myfleet.aims = myfleet.fieldcoords
+        if len(myfleet.aims) != myfleet.field_size ** 2:
             myfleet.show_chess()
-        coords = myfleet.coordsinput(possible_aims, 'Введите координаты через пробел для поражения корабля противника:\n')
-        if enemyfleet.checkcoord(coords):
+        coords = myfleet.coordsinput(myfleet.aims, 'Введите координаты через пробел для поражения корабля противника:\n')
+        myfleet.fieldcoords.remove(coords)
+        if myfleet.aims is not myfleet.fieldcoords:
+            myfleet.aims.remove(coords)
+        fireresult = enemyfleet.checkcoord(coords)
+        if fireresult == 'Попадание' or fireresult == 'Убил':
             myfleet.score += 1
             myfleet.draw_enemyfield(coords, 'x')
-        else:
+            myfleet.markenemyship(coords, fireresult)
+        elif fireresult == 'Мимо':
             myfleet.draw_enemyfield(coords, 'T')
-        myfleet.fieldcoords.remove(coords)
-
 
     @classmethod
     def setfleet(cls, fleet):
@@ -206,12 +226,12 @@ class GameRun:
                         fleet.fieldcoords.remove(_)
                 else:
                     possible_aims = fleet.possible_pos(ships.position)
-        fleet.show_chess(False)  # для просмотра поля PC-юзера
+        #fleet.show_chess(False)  # для просмотра поля PC-юзера
 
 
 if __name__ == "__main__":
-    # armada_ships = {'Корабль 1': 3, 'Корабль 2': 2, 'Корабль 3': 2, 'Корабль 4': 1,'Корабль 5': 3, 'Корабль 6': 1, 'Корабль 7': 1}
-    armada = {'Корабль 1': 3, 'Корабль 2': 2}
-    users = ('PC', 'PC')
-    run = GameRun(4, armada, users)
+    armada = {'Корабль 1': 3, 'Корабль 2': 2, 'Корабль 3': 2, 'Корабль 4': 1,'Корабль 5': 1, 'Корабль 6': 1, 'Корабль 7': 1}
+    # armada = {'Корабль 1': 3, 'Корабль 2': 2}
+    users = ('USER1', 'PC')
+    run = GameRun(7, armada, users)
     run.gameprocess()
