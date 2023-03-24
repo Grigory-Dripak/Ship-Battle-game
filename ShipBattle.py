@@ -147,7 +147,7 @@ class BattleField(GameUser):
         return (min(l), max(l))
 
     def show_chess(self, status=True):
-       """вывод поля играка и противника с осями координат"""
+        """вывод поля играка и противника с осями координат"""
         if self.userid == 'PC' and status:
             pass
         else:
