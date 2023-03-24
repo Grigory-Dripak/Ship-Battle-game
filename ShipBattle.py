@@ -6,9 +6,9 @@ class GameUser:
         self.userid = userid
         self.score = 0
 
-
     def coordsinput(self, aims, message):
         if self.userid == 'PC':
+            #для компьютера рандомно выбираем координату из имеющихся целей
             self.coords = aims[randint(0, len(aims)-1)]
         else:
             repeate = True
@@ -38,11 +38,13 @@ class Ship:
     def position(self, coords):
         self.__position.append(coords)
 
+    def resetposition(self):
+        self.__position.clear()
+
 
 class BattleField(GameUser):
     def __init__(self, field_size, armada_params, userid):
         super().__init__(userid)
-
         self.field_size = field_size
         self.my_field = [["o" for _ in range(field_size)] for _ in range(field_size)]
         self.enemy_field = [["o" for _ in range(field_size)] for _ in range(field_size)]
@@ -56,6 +58,12 @@ class BattleField(GameUser):
     def renew_fieldcoords(self):
         self.fieldcoords = [(i, j) for j in range(1, self.field_size + 1) for i in range(1, self.field_size + 1)]
 
+    def resetfleetsettings(self):
+        self.fieldcoords = [(i, j) for j in range(1, self.field_size + 1) for i in range(1, self.field_size + 1)]
+        self.my_field = [["o" for _ in range(self.field_size)] for _ in range(self.field_size)]
+        for ships in self.armada.values():
+            ships.resetposition()
+
     def draw_myfield(self, point, status='■'):
         self.my_field[point[0]-1][point[1]-1] = status
 
@@ -63,6 +71,8 @@ class BattleField(GameUser):
         self.enemy_field[point[0]-1][point[1]-1] = status
 
     def markenemyship(self, point, status):
+        """составляем список кораблей противника с их позициями
+        для определения возможных координат для следующего выстрела"""
         if len(self.enemyship) == 0 or self.enemyship[-1].status == 'Убил':
             self.enemyship.append(Ship())
             self.enemyship[-1].status = status
@@ -77,8 +87,8 @@ class BattleField(GameUser):
                     self.fieldcoords.remove(_)
             self.aims = self.fieldcoords
 
-
     def checkcoord(self, point):
+        """проверка выстрела противника на попадание в цель"""
         if self.my_field[point[0]-1][point[1]-1] == '■':
             self.draw_myfield(point, 'x')
             print(f'{self.userid}: Попадание по кораблю!')
@@ -96,6 +106,7 @@ class BattleField(GameUser):
             return 'Мимо'
 
     def close_positions(self, positionpoints):
+        """определяем координаты по периметру позиции корабля"""
         self.closepoints = []
         for point in positionpoints:
             p = lambda i, j: (point[0] + i, point[1] + j)
@@ -106,8 +117,8 @@ class BattleField(GameUser):
         return self.closepoints
 
     def possible_pos(self, positionpoints):
+        """определяем возможные цели координат исходя из заданной позиции и текущего поля"""
         temp_points = []
-
         if len(positionpoints) > 1:
             if positionpoints[0][0] == positionpoints[1][0]:
                 minmax = self.minmax_value(positionpoints, 1)
@@ -131,11 +142,12 @@ class BattleField(GameUser):
 
     @classmethod
     def minmax_value(cls, pos, ind):
+        """Вспомогательный метод для метода possible_pos"""
         l = [i[ind] for i in pos]
         return (min(l), max(l))
 
     def show_chess(self, status=True):
-        # демонстрация поля вместе с осями координат
+       """вывод поля играка и противника с осями координат"""
         if self.userid == 'PC' and status:
             pass
         else:
@@ -159,13 +171,21 @@ class GameRun:
 
 
     def gameprocess(self):
-        #построение кораблей на пользовательском поле (определение координат)
+        # Фаза 1: построение кораблей на пользовательском поле
         for fleet in self.userfleets:
-            self.setfleet(fleet)
-        #заново генерируем целевой список координат для следующего этапа игры
+            while True:
+                if self.setfleet(fleet):
+                    break
+                else:
+                    if fleet.userid != 'PC':
+                        print('Все корабли на поле не поместились, необходимо разместить корабли заново')
+                    fleet.resetfleetsettings()
+
+        #подготовка к следующей фазе игры: заново генерируем целевой список координат
         for fleet in self.userfleets:
             fleet.renew_fieldcoords()
-        #поочередно стреляем для уничтожения флота противника
+
+        # Фаза 2: поочередно стреляем для уничтожения флота противника
         while True:
             self.shipsfire(self.userfleets[0], self.userfleets[1])
             self.checkscore(self.userfleets[0])
@@ -174,6 +194,7 @@ class GameRun:
 
     def checkscore(self, fleet):
         if fleet.score == self.maxscore:
+            fleet.show_chess(False)
             print(f'ПОБЕДА ЗА {fleet.userid}!!!')
             exit(0)
 
@@ -191,7 +212,8 @@ class GameRun:
         if fireresult == 'Попадание' or fireresult == 'Убил':
             myfleet.score += 1
             myfleet.draw_enemyfield(coords, 'x')
-            myfleet.markenemyship(coords, fireresult)
+            if myfleet.userid == 'PC':
+                myfleet.markenemyship(coords, fireresult)
         elif fireresult == 'Мимо':
             myfleet.draw_enemyfield(coords, 'T')
 
@@ -207,9 +229,9 @@ class GameRun:
                         msg += f'-список возм-х координат: {possible_aims}\n'
                     # делаем запрос для определения координат (выбор из возможных координат)
                     coords = fleet.coordsinput(possible_aims, msg)
-                elif len(possible_aims) == 0 and ship_point == 0:
-                    print(f'Игра завершена, т.к. на карте нет места для размещения {name} для игрока {fleet.userid}')
-                    exit(0)
+                #для случая, когда корабль не вмещается
+                elif len(possible_aims) == 0:
+                    return False
                 else:
                     # а смысл запрашивать, если вариант только 1, поэтому присваеваем сразу
                     coords = possible_aims[0]
@@ -226,12 +248,12 @@ class GameRun:
                         fleet.fieldcoords.remove(_)
                 else:
                     possible_aims = fleet.possible_pos(ships.position)
+        return True
         #fleet.show_chess(False)  # для просмотра поля PC-юзера
 
 
 if __name__ == "__main__":
     armada = {'Корабль 1': 3, 'Корабль 2': 2, 'Корабль 3': 2, 'Корабль 4': 1,'Корабль 5': 1, 'Корабль 6': 1, 'Корабль 7': 1}
-    # armada = {'Корабль 1': 3, 'Корабль 2': 2}
     users = ('USER1', 'PC')
-    run = GameRun(7, armada, users)
+    run = GameRun(6, armada, users)
     run.gameprocess()
