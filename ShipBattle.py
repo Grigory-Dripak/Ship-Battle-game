@@ -23,21 +23,38 @@ class GameUser:
         return self.coords
 
 
+class Ship:
+    def __init__(self, name, size):
+        self.name = name
+        self.size = size
+        self.__position = []
+
+    @property
+    def position(self):
+        return self.__position
+
+    @position.setter
+    def position(self, coords):
+        self.__position.append(coords)
+
 
 class BattleField(GameUser):
     def __init__(self, field_size, armada_params, userid):
         super().__init__(userid)
 
         self.field_size = field_size
-        self.my_field = [["o" for _ in range(self.field_size)] for _ in range(self.field_size)]
-        self.enemy_field = [["o" for _ in range(self.field_size)] for _ in range(self.field_size)]
-
-        self.selfcoords = [(i, j) for j in range(1, field_size + 1) for i in range(1, field_size + 1)]
-        self.enemycoords = [(i, j) for j in range(1, field_size + 1) for i in range(1, field_size + 1)]
+        self.my_field = [["o" for _ in range(field_size)] for _ in range(field_size)]
+        self.enemy_field = [["o" for _ in range(field_size)] for _ in range(field_size)]
+        self.fieldcoords = [(i, j) for j in range(1, field_size + 1) for i in range(1, field_size + 1)]
+        # self.selfcoords = [(i, j) for j in range(1, field_size + 1) for i in range(1, field_size + 1)]
+        # self.enemycoords = [(i, j) for j in range(1, field_size + 1) for i in range(1, field_size + 1)]
 
         self.armada = {}
         for ships, sizes in armada_params.items():
             self.armada[ships] = Ship(ships, sizes)
+
+    def renew_fieldcoords(self):
+        self.fieldcoords = [(i, j) for j in range(1, self.field_size + 1) for i in range(1, self.field_size + 1)]
 
     def draw_myfield(self, point, status='■'):
         self.my_field[point[0]-1][point[1]-1] = status
@@ -49,11 +66,57 @@ class BattleField(GameUser):
         if self.my_field[point[0]-1][point[1]-1] == '■':
             self.draw_myfield(point, 'x')
             print(f'{self.userid}: Попадание по кораблю!')
-            return True
+            for ships in self.armada.values():
+                if point in ships.position:
+                    ships.position.remove(point)
+                    if len(ships.position) == 0:
+                        print(f'{self.userid}: Убил!')
+                        return 'Убил'
+                    else:
+                        return 'Попадание'
         else:
             print(f'{self.userid}: Огонь мимо цели...')
             self.draw_myfield(point, 'T')
             return False
+
+    def close_positions(self, positionpoints):
+        self.closepoints = []
+        for point in positionpoints:
+            p = lambda i, j: (point[0] + i, point[1] + j)
+            temppoints = [p(i, j) for i in range(-1, 2) for j in range(-1, 2)]
+            for tpoint in temppoints:
+                if tpoint in self.fieldcoords and tpoint not in self.closepoints:
+                    self.closepoints.append(tpoint)
+        return self.closepoints
+
+    def possible_pos(self, positionpoints):
+        temp_points = []
+
+        if len(positionpoints) > 1:
+            if positionpoints[0][0] == positionpoints[1][0]:
+                minmax = self.minmax_value(positionpoints, 1)
+                temp_points.append((positionpoints[0][0], minmax[0] - 1))
+                temp_points.append((positionpoints[0][0], minmax[1] + 1))
+            else:
+                minmax = self.minmax_value(positionpoints, 0)
+                temp_points.append((minmax[0] - 1, positionpoints[0][1]))
+                temp_points.append((minmax[1] + 1, positionpoints[0][1]))
+        else:
+            temp_points.append((positionpoints[0][0], positionpoints[0][1] + 1))
+            temp_points.append((positionpoints[0][0], positionpoints[0][1] - 1))
+            temp_points.append((positionpoints[0][0] + 1, positionpoints[0][1]))
+            temp_points.append((positionpoints[0][0] - 1, positionpoints[0][1]))
+
+        self.final_points = []
+        for _ in temp_points:
+            if _ in self.fieldcoords:
+                self.final_points.append(_)
+        return self.final_points
+
+    @classmethod
+    def minmax_value(cls, pos, ind):
+        l = [i[ind] for i in pos]
+        return (min(l), max(l))
 
     def show_chess(self, status=True):
         # демонстрация поля вместе с осями координат
@@ -71,60 +134,6 @@ class BattleField(GameUser):
                 print(f"{i} | {' | '.join(self.my_field[i - 1])} |    ||    | {' | '.join(self.enemy_field[i - 1])} | {i}")
 
 
-class Ship:
-    def __init__(self, name, size):
-        self.name = name
-        self.size = size
-        self.__position = []
-
-    @property
-    def position(self):
-        return self.__position
-
-    @position.setter
-    def position(self, coords):
-        self.__position.append(coords)
-
-    def close_positions(self, field):
-        self.cl_pos = []
-        for point in self.__position:
-            p = lambda i, j: (point[0]+i, point[1]+j)
-            some_points = [p(i, j) for i in range(-1, 2) for j in range(-1, 2)]
-            for sp in some_points:
-                if sp in field and sp not in self.cl_pos:
-                    self.cl_pos.append(sp)
-        return self.cl_pos
-
-    def possible_pos(self, field):
-        temp_pos = []
-
-        if len(self.__position) > 1:
-            if self.__position[0][0] == self.__position[1][0]:
-                s = self.minmax_value(self.__position, 1)
-                temp_pos.append((self.__position[0][0], s[0] - 1))
-                temp_pos.append((self.__position[0][0], s[1] + 1))
-            else:
-                s = self.minmax_value(self.__position, 0)
-                temp_pos.append((s[0] - 1, self.__position[0][1]))
-                temp_pos.append((s[1] + 1 , self.__position[0][1]))
-        else:
-            temp_pos.append((self.__position[0][0], self.__position[0][1] + 1))
-            temp_pos.append((self.__position[0][0], self.__position[0][1] - 1))
-            temp_pos.append((self.__position[0][0] + 1, self.__position[0][1]))
-            temp_pos.append((self.__position[0][0] - 1, self.__position[0][1]))
-
-        self.final_pos = []
-        for _ in temp_pos:
-            if _ in field:
-                self.final_pos.append(_)
-        return self.final_pos
-
-    @classmethod
-    def minmax_value(cls, pos, ind):
-        l = [i[ind] for i in pos]
-        return (min(l), max(l))
-
-
 class GameRun:
     def __init__(self, field_size, armada_params, users):
         self.userfleets = (BattleField(field_size, armada_params, users[0]), BattleField(field_size, armada_params, users[1]))
@@ -137,6 +146,9 @@ class GameRun:
         #построение кораблей на пользовательском поле (определение координат)
         for fleet in self.userfleets:
             self.setfleet(fleet)
+        #заново генерируем целевой список координат для следующего этапа игры
+        for fleet in self.userfleets:
+            fleet.renew_fieldcoords()
         # #поочередно стреляем для уничтожения флота противника
         while True:
             self.shipsfire(self.userfleets[0], self.userfleets[1])
@@ -151,7 +163,7 @@ class GameRun:
 
     @classmethod
     def shipsfire(cls, myfleet, enemyfleet):
-        possible_aims = myfleet.enemycoords
+        possible_aims = myfleet.fieldcoords
         if len(possible_aims) != myfleet.field_size ** 2:
             myfleet.show_chess()
         coords = myfleet.coordsinput(possible_aims, 'Введите координаты через пробел для поражения корабля противника:\n')
@@ -160,14 +172,14 @@ class GameRun:
             myfleet.draw_enemyfield(coords, 'x')
         else:
             myfleet.draw_enemyfield(coords, 'T')
-        myfleet.enemycoords.remove(coords)
+        myfleet.fieldcoords.remove(coords)
 
 
     @classmethod
     def setfleet(cls, fleet):
         fleet.show_chess()
         for name, ships in fleet.armada.items():
-            possible_aims = fleet.selfcoords
+            possible_aims = fleet.fieldcoords
             for ship_point in range(ships.size):
                 if len(possible_aims) > 1:
                     msg = f'Введи через пробел номер стоки и колонки для координаты {ship_point + 1} из {ships.size} {name}:\n'
@@ -175,6 +187,9 @@ class GameRun:
                         msg += f'-список возм-х координат: {possible_aims}\n'
                     # делаем запрос для определения координат (выбор из возможных координат)
                     coords = fleet.coordsinput(possible_aims, msg)
+                elif len(possible_aims) == 0 and ship_point == 0:
+                    print(f'Игра завершена, т.к. на карте нет места для размещения {name} для игрока {fleet.userid}')
+                    exit(0)
                 else:
                     # а смысл запрашивать, если вариант только 1, поэтому присваеваем сразу
                     coords = possible_aims[0]
@@ -182,23 +197,21 @@ class GameRun:
                         print(f'Координата {ship_point + 1} из {ships.size} {name} присвоена {coords}')
                 ships.position = coords
                 fleet.draw_myfield(coords)
-                fleet.selfcoords.remove(coords)
+                fleet.fieldcoords.remove(coords)
                 fleet.show_chess()
                 # когда координаты корабля уже заданы убираем свободные координаты по периметру вокруг корабля
                 if ship_point == ships.size - 1:
-                    cl_pos = ships.close_positions(fleet.selfcoords)
-                    for _ in cl_pos:
-                        fleet.selfcoords.remove(_)
+                    close_points = fleet.close_positions(ships.position)
+                    for _ in close_points:
+                        fleet.fieldcoords.remove(_)
                 else:
-                    possible_aims = ships.possible_pos(fleet.selfcoords)
-        # fleet.show_chess(False)  # для просмотра поля PC-юзера
-
-
+                    possible_aims = fleet.possible_pos(ships.position)
+        fleet.show_chess(False)  # для просмотра поля PC-юзера
 
 
 if __name__ == "__main__":
     # armada_ships = {'Корабль 1': 3, 'Корабль 2': 2, 'Корабль 3': 2, 'Корабль 4': 1,'Корабль 5': 3, 'Корабль 6': 1, 'Корабль 7': 1}
     armada = {'Корабль 1': 3, 'Корабль 2': 2}
-    users = ('USER 1', 'PC')
-    run = GameRun(3, armada, users)
+    users = ('PC', 'PC')
+    run = GameRun(4, armada, users)
     run.gameprocess()
