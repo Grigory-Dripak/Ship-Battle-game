@@ -140,8 +140,8 @@ class BattleField(GameUser):
                 self.final_points.append(_)
         return self.final_points
 
-    @classmethod
-    def minmax_value(cls, pos, ind):
+    @staticmethod
+    def minmax_value(pos, ind):
         """Вспомогательный метод для метода possible_pos"""
         l = [i[ind] for i in pos]
         return (min(l), max(l))
@@ -171,8 +171,17 @@ class GameRun:
 
 
     def gameprocess(self):
+        print('НАЧАЛО ИГРЫ МОРСКОЙ БОЙ')
+        print('НЕОБХОДИМО РАССТАВИТЬ КОРАБЛИ ПО ПОЗИЦИЯМ НА ПОЛЕ')
         # Фаза 1: построение кораблей на пользовательском поле
         for fleet in self.userfleets:
+            changeid = False
+            if fleet.userid != 'PC':
+                if input('Введите 1 для автоматической расстановки кораблей на поле '
+                         'или иной символ для ручного определения позиций: \n') == '1':
+                    changeid = True
+                    save_id = fleet.userid
+                    fleet.userid = 'PC'
             while True:
                 if self.setfleet(fleet):
                     break
@@ -180,12 +189,19 @@ class GameRun:
                     if fleet.userid != 'PC':
                         print('Все корабли на поле не поместились, необходимо разместить корабли заново')
                     fleet.resetfleetsettings()
+            if changeid:
+                fleet.userid = save_id
+
 
         #подготовка к следующей фазе игры: заново генерируем целевой список координат
         for fleet in self.userfleets:
             fleet.renew_fieldcoords()
 
         # Фаза 2: поочередно стреляем для уничтожения флота противника
+        print('__________________________________________________________')
+        print('ОГОНЬ ПО ПОЗИЦИЯМ ПРОТИВНИКА: БОЙ ДО ПОСЛЕДНЕГО КОРАБЛЯ')
+        print('__________________________________________________________')
+
         while True:
             self.shipsfire(self.userfleets[0], self.userfleets[1])
             self.checkscore(self.userfleets[0])
@@ -198,12 +214,11 @@ class GameRun:
             print(f'ПОБЕДА ЗА {fleet.userid}!!!')
             exit(0)
 
-    @classmethod
-    def shipsfire(cls, myfleet, enemyfleet):
+    @staticmethod
+    def shipsfire(myfleet, enemyfleet):
         if len(myfleet.aims) == 0:
             myfleet.aims = myfleet.fieldcoords
-        if len(myfleet.aims) != myfleet.field_size ** 2:
-            myfleet.show_chess()
+        myfleet.show_chess()
         coords = myfleet.coordsinput(myfleet.aims, 'Введите координаты через пробел для поражения корабля противника:\n')
         myfleet.fieldcoords.remove(coords)
         if myfleet.aims is not myfleet.fieldcoords:
@@ -217,8 +232,8 @@ class GameRun:
         elif fireresult == 'Мимо':
             myfleet.draw_enemyfield(coords, 'T')
 
-    @classmethod
-    def setfleet(cls, fleet):
+    @staticmethod
+    def setfleet(fleet):
         fleet.show_chess()
         for name, ships in fleet.armada.items():
             possible_aims = fleet.fieldcoords
@@ -249,7 +264,6 @@ class GameRun:
                 else:
                     possible_aims = fleet.possible_pos(ships.position)
         return True
-        #fleet.show_chess(False)  # для просмотра поля PC-юзера
 
 
 if __name__ == "__main__":
